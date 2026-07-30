@@ -21,24 +21,24 @@ switch (responseCode) {
     case 201:
         console.log("Res code is: " + responseCode + "PASS - Created: Resource created successfully");
         break;
-      case 301:
-        console.log("Res code is: " + responseCode + "WARNING - Moved Permanently: URL has changed");
-        break;
-      case 400:
-        console.log("Res code is: " + responseCode + "FAIL - Bad Request: Check request payload");
-        break;
-      case 401:
-        console.log("Res code is: " + responseCode + "FAIL - Unauthorized: Check auth token");
-        break;
-      case 403:
-        console.log("Res code is: " + responseCode + "FAIL - Forbidden: Insufficient permissions");
-        break;
-      case 404:
-        console.log("Res code is: " + responseCode + "FAIL - Not Found: Check endpoint URL");
-        break;
-       case 500:
-        console.log("Res code is: " + responseCode + "FAIL - Internal Server Error: Backend issue");
-        break;
+    case 301:
+      console.log("Res code is: " + responseCode + "WARNING - Moved Permanently: URL has changed");
+      break;
+    case 400:
+      console.log("Res code is: " + responseCode + "FAIL - Bad Request: Check request payload");
+      break;
+    case 401:
+      console.log("Res code is: " + responseCode + "FAIL - Unauthorized: Check auth token");
+      break;
+    case 403:
+      console.log("Res code is: " + responseCode + "FAIL - Forbidden: Insufficient permissions");
+      break;
+    case 404:
+      console.log("Res code is: " + responseCode + "FAIL - Not Found: Check endpoint URL");
+      break;
+    case 500:
+      console.log("Res code is: " + responseCode + "FAIL - Internal Server Error: Backend issue");
+      break;
     default:
-        console.log("Res code is: " + responseCode + "UNKNOWN - Unhandled status code");
+      console.log("Res code is: " + responseCode + "UNKNOWN - Unhandled status code");
 }
