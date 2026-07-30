@@ -1,0 +1,17 @@
+let statuses = ["pass", "fail", "skip"];
+
+console.log(statuses[0]);
+console.log(statuses[2]);
+
+console.log(statuses.at(-1));
+console.log(statuses.at(-2));
+
+console.log(statuses.at(-4));
+
+
+browsers.push("guva");   //New elements to add to the array.
+browsers.pop(0);
+browsers.shift(); //add at 1st
+browsers.unshift(); //remove at 1st
+
+browsers.splice();
