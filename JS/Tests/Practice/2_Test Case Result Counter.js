@@ -10,6 +10,7 @@ Output Format : A test report with counts, pass rate, and verdict
 Examples
 Input : testResults = ["pass", "pass", "fail", "pass", "skip", "pass", "fail", "pass"]
 Output: Total Tests : 8 Passed: 5 Failed: 2 Skipped: 1 Pass Rate: 62.50% VERDICT: Minor failures. Review before release. */
+// ===============================================
 
 let testResults = ["pass", "pass", "fail", "pass", "skip", "pass", "fail", "pass"];
 let arrEleCount = testResults.length;
