@@ -40,29 +40,8 @@
     process.stdout.write(`Expected: ${outputFinal}`);
  */
 
-
-// FizzBuzz: Print numbers from 1 to n. For multiples of 3, print 'Fizz'. For multiples of 5, print 'Buzz'. For multiples of both 3 and 5, print 'FizzBuzz'.
-
-//const data = require('fs').readFileSync(0, 'utf8');
-// Write your solution here
-    // let data=15;
-    // let prodVal;
-
-    // for (i = 1; i <= 15; i++){
-    //     prodVal = data * i
-
-    //     if (prodVal % 3 === 0  && prodVal % 5 === 0){
-    //         console.log("FizzBuzz");
-    //     }
-    //     else if (prodVal % 3 === 0){
-    //         console.log("Fizz");
-    //     }
-    //     else if (prodVal % 5 === 0) {
-    //         console.log("Buzz");
-    //     }
-    
-        
-let a;
+ 
+/* let a;
 console.log(a);
 console.log(typeof undefined);
 console.log(typeof NaN);
@@ -95,4 +74,4 @@ console.log(typeof NaN);
 
     console.log(Boolean([]));
 
-    for (let i = 0; i < 5; i++) { if (i === 3) break; } console.log(i);
+    for (let i = 0; i < 5; i++) { if (i === 3) break; } console.log(i); */
