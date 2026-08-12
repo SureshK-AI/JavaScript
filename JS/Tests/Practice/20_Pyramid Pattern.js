@@ -5,35 +5,23 @@ Input: 3
 Output:   *
          ***
         *****
-
 Example 2
 Input : 4
 Output : *
         ***
        *****
       ******* */
+let n = 7;
 
-
-
-// for (let i=1;i<=inpNum;i++){
-//     let fullStr="";
-//     for (let j=1; j<=i;j++){
-//         fullStr =  fullStr +"*";
-//     }
-//     console.log(fullStr);
-// }
-
-let inpNum=3;
-let i =1;
-while (i<=inpNum) {
-
-        if (i%2) {
-        let fullStr="";
-        for (let j=1; j<=i;j++){
-                fullStr =  fullStr +"*";
-        }
-        i = i + 1
-        console.log(fullStr);
-        }
-   
+for (let i = 1; i <= n; i++) {
+    let fullStr = "";
+    // Spaces
+    for (let j = 1; j <= n - i; j++) {
+        fullStr += " ";
+    }
+    // Stars
+    for (let j = 1; j <= (2 * i - 1); j++) {
+        fullStr += "*";
+    }
+    console.log(fullStr);
 }
