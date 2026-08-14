@@ -8,7 +8,7 @@ Example 2
 Input: 7
 Output: 0 1 1 2 3 5 8 */
 
-let preValue=0;
+/* let preValue=0;
 let curValue=1;
 let noOfTimes = 7;
 let res=0, outPut="";
@@ -27,4 +27,19 @@ for (i=0;i<=noOfTimes-1;i++){
     }
 
 }
-  console.log(outPut);
+  console.log(outPut); */
+
+let preValue = 0;
+let curValue = 1;
+let noOfTimes = 7;
+let output = "";
+
+for (let i = 0; i < noOfTimes; i++) {
+    output += preValue + " ";
+
+    let nextValue = preValue + curValue;
+    preValue = curValue;
+    curValue = nextValue;
+}
+
+console.log(output);
