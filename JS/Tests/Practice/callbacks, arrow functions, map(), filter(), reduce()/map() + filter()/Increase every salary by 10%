@@ -1,0 +1,6 @@
+/* Increase every salary by 10%
+[
+  {name:"A", salary:50000},
+  {name:"B", salary:60000}
+
+Expected salaries:55000 66000] */
