@@ -15,5 +15,29 @@ const numbers = [
 ];
 
 const searchValue = 30;
+let col = -1;
+let row1 = -1;
 
-// TODO: Search for the value and print row and column.
+for (let i = 0; i < numbers.length; i++) {
+
+    let row = numbers[i];
+
+    for (let j = 0; j < row.length; j++) {
+
+        if (searchValue === row[j]) {
+            row1 = i;
+            col = j;
+            break;
+        }
+    }
+
+    // If value was found, stop outer loop as well
+    if (row1 !== -1) {
+        break;
+    }
+}
+
+if (row1 !== -1) {
+    console.log(`${searchValue} found at row ${row1}, column ${col}`);
+} else {
+    console.log(`${searchValue} not found`)};

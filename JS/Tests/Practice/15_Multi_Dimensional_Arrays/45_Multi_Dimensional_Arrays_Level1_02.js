@@ -17,3 +17,15 @@ const matrix = [
 ];
 
 // TODO: Print the matrix row by row.
+let res="";
+
+for (i=0; i<matrix.length;i++) {
+    let row = matrix[i];
+
+    for (j=0; j<row.length;j++) {
+        res += row[j] + " ";
+    } 
+    console.log(res);
+    res="";
+}
+

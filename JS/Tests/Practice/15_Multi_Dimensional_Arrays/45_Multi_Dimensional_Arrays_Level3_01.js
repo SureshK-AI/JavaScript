@@ -24,3 +24,32 @@ const testCases = [
 ];
 
 // TODO: Solve using loops.
+let finRes="";
+let passCnt=0,failCnt=0;failTCName="", percentage=0;
+let totNoOfTCs = testCases.length;
+
+for (i=0; i<testCases.length;i++) {
+    let row = testCases[i]
+    let status = row[2];
+
+    switch (status){
+    case "Pass":
+        passCnt += 1;
+        break;
+    case "Fail":
+        failCnt += 1;
+        failTCName += row[0] + " ";
+        break;
+    default:
+
+    }
+
+}
+// console.log(` Passed: ${passCnt} \n Failed: ${failCnt} \n Pass Percentage: ${(passCnt/totNoOfTCs)*100} % \n Failed TC: ${failTCName}`);
+
+console.log(
+    `Passed: ${passCnt} 
+Failed: ${failCnt} 
+Pass Percentage: ${(passCnt / totNoOfTCs) * 100}
+Failed TC: ${failTCName}`
+);

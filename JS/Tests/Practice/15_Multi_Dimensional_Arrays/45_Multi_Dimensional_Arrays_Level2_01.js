@@ -14,3 +14,16 @@ const numbers = [
 ];
 
 // TODO: Find the maximum value using nested loops.
+let res=0;
+
+for (i=0; i<numbers.length;i++) {
+    let row = numbers[i];
+
+    for (j=0; j<row.length;j++) {
+
+        if (res< row[j]){
+        res = row[j];
+        }
+    } 
+}
+    console.log(res);

@@ -18,3 +18,16 @@ const students = [
 ];
 
 // TODO: Calculate and print each student's total.
+let finRes="";
+
+for (i=0; i<students.length;i++) {
+    let row = students[i];
+
+    let res=0;
+    for (j=1; j<row.length;j++) {
+        res += row[j];
+    }
+    finRes = finRes + (row[0] + " " + res) + "\n";
+    
+}
+    console.log(finRes);
