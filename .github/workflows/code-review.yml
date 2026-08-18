@@ -20,10 +20,10 @@ jobs:
           fetch-depth: 0
 
       - name: Get PR information
-        id: pr-info
         run: |
           echo "Base SHA: ${{ github.event.pull_request.base.sha }}"
           echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
+          echo "PR Number: ${{ github.event.pull_request.number }}"
 
       - name: Read review rules and PR changes
         env:
@@ -37,6 +37,7 @@ jobs:
             "$BASE_SHA" "$HEAD_SHA" \
             -- . \
             ':(exclude)CODE_REVIEW.md' \
+            ':(exclude).github/workflows/code-review.yml' \
             > /tmp/pr-diff.txt
 
           echo "Review instructions:"
@@ -45,10 +46,9 @@ jobs:
           echo "PR diff:"
           wc -c /tmp/pr-diff.txt
 
-      - name: Run AI code review
-        id: review
+      - name: Run Gemini AI code review
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           node <<'NODE'
           const fs = require("fs");
@@ -63,7 +63,7 @@ jobs:
             "utf8"
           );
 
-          // Prevent extremely large PRs from exceeding the model context.
+          // Prevent extremely large PRs from exceeding model limits.
           const MAX_DIFF_LENGTH = 120000;
 
           if (diff.length > MAX_DIFF_LENGTH) {
@@ -73,31 +73,62 @@ jobs:
           }
 
           const prompt = `
-          You are an expert software code reviewer.
+          You are a senior software engineer and expert code reviewer.
 
-          Review the Pull Request using the review rules below.
+          Your job is to review the Pull Request changes using the
+          repository's CODE_REVIEW.md rules.
 
-          ================================
+          ============================================================
           CODE REVIEW RULES
-          ================================
+          ============================================================
 
           ${reviewRules}
 
-          ================================
-          PULL REQUEST CHANGES
-          ================================
+          ============================================================
+          PULL REQUEST DIFF
+          ============================================================
 
           ${diff}
 
-          ================================
-          REVIEW INSTRUCTIONS
-          ================================
+          ============================================================
+          REVIEW REQUIREMENTS
+          ============================================================
 
-          Review ONLY the changes shown in the PR diff.
+          Review ONLY the code shown in the Pull Request diff.
 
-          Do not invent problems.
+          Do not invent issues.
 
-          Identify only actionable issues.
+          Do not criticize code that was not changed unless the changed
+          code directly introduces or depends on the problem.
+
+          Focus on actionable issues.
+
+          Pay special attention to:
+
+          1. Correctness
+          2. Bugs
+          3. JavaScript quality
+          4. Playwright test reliability
+          5. Async/await and Promise handling
+          6. Locators and test stability
+          7. Assertions
+          8. API testing
+          9. Error handling
+          10. Security
+          11. Hard-coded credentials or secrets
+          12. Duplicate code
+          13. Maintainability
+          14. Performance
+          15. Flaky test risks
+
+          Severity levels:
+
+          CRITICAL
+          HIGH
+          MEDIUM
+          LOW
+
+          Only report a severity when there is a real actionable issue.
 
           For every issue provide:
 
@@ -108,21 +139,16 @@ jobs:
           - Why it matters
           - Recommended fix
 
-          Severity levels:
-
-          CRITICAL
-          HIGH
-          MEDIUM
-          LOW
+          If the code is good, do NOT manufacture issues.
 
           At the end provide:
 
           ## Summary
 
-          Critical:
-          High:
-          Medium:
-          Low:
+          Critical: <number>
+          High: <number>
+          Medium: <number>
+          Low: <number>
 
           ## Final Recommendation
 
@@ -132,48 +158,90 @@ jobs:
 
           CHANGES REQUESTED
 
-          If there are no issues, clearly say:
+          If no actionable problems are found, say:
 
           No actionable issues found.
           `;
 
-          async function main() {
-            const response = await fetch(
-              "https://api.openai.com/v1/responses",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
-                },
-                body: JSON.stringify({
-                  model: "gpt-5.6",
-                  input: prompt
-                })
-              }
-            );
+          async function callGemini(model) {
+            const url =
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-            if (!response.ok) {
-              const errorText = await response.text();
-              throw new Error(
-                `OpenAI API error ${response.status}: ${errorText}`
-              );
-            }
+            const response = await fetch(url, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-goog-api-key": process.env.GEMINI_API_KEY
+              },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      {
+                        text: prompt
+                      }
+                    ]
+                  }
+                ],
+                generationConfig: {
+                  temperature: 0.1,
+                  maxOutputTokens: 5000
+                }
+              })
+            });
 
             const data = await response.json();
 
-            const review = data.output_text;
-
-            if (!review) {
-              throw new Error("OpenAI returned an empty review.");
+            if (!response.ok) {
+              throw new Error(
+                `Gemini API error ${response.status}: ${JSON.stringify(data)}`
+              );
             }
+
+            const text =
+              data?.candidates?.[0]?.content?.parts
+                ?.map(part => part.text || "")
+                .join("")
+                .trim();
+
+            if (!text) {
+              throw new Error(
+                `Gemini returned no review text: ${JSON.stringify(data)}`
+              );
+            }
+
+            return text;
+          }
+
+          async function main() {
+            if (!process.env.GEMINI_API_KEY) {
+              throw new Error(
+                "GEMINI_API_KEY GitHub secret is not configured."
+              );
+            }
+
+            /*
+             * Start with Flash because it is suitable for the first
+             * free-tier test and generally has more accessible quota.
+             *
+             * We can change this later to:
+             * gemini-2.5-pro
+             * if your project has usable Pro quota.
+             */
+            const model = "gemini-2.5-flash";
+
+            console.log(`Using Gemini model: ${model}`);
+
+            const review = await callGemini(model);
 
             fs.writeFileSync(
               "/tmp/review.txt",
               review
             );
 
+            console.log("===== AI CODE REVIEW =====");
             console.log(review);
+            console.log("==========================");
           }
 
           main().catch(error => {
