@@ -1,0 +1,191 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  code-review:
+    name: AI Code Review
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR information
+        id: pr-info
+        run: |
+          echo "Base SHA: ${{ github.event.pull_request.base.sha }}"
+          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
+
+      - name: Read review rules and PR changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git show "$BASE_SHA:CODE_REVIEW.md" > /tmp/CODE_REVIEW.md
+
+          git diff \
+            --unified=80 \
+            "$BASE_SHA" "$HEAD_SHA" \
+            -- . \
+            ':(exclude)CODE_REVIEW.md' \
+            > /tmp/pr-diff.txt
+
+          echo "Review instructions:"
+          wc -c /tmp/CODE_REVIEW.md
+
+          echo "PR diff:"
+          wc -c /tmp/pr-diff.txt
+
+      - name: Run AI code review
+        id: review
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+
+          const reviewRules = fs.readFileSync(
+            "/tmp/CODE_REVIEW.md",
+            "utf8"
+          );
+
+          let diff = fs.readFileSync(
+            "/tmp/pr-diff.txt",
+            "utf8"
+          );
+
+          // Prevent extremely large PRs from exceeding the model context.
+          const MAX_DIFF_LENGTH = 120000;
+
+          if (diff.length > MAX_DIFF_LENGTH) {
+            diff =
+              diff.substring(0, MAX_DIFF_LENGTH) +
+              "\n\n[PR DIFF TRUNCATED]";
+          }
+
+          const prompt = `
+          You are an expert software code reviewer.
+
+          Review the Pull Request using the review rules below.
+
+          ================================
+          CODE REVIEW RULES
+          ================================
+
+          ${reviewRules}
+
+          ================================
+          PULL REQUEST CHANGES
+          ================================
+
+          ${diff}
+
+          ================================
+          REVIEW INSTRUCTIONS
+          ================================
+
+          Review ONLY the changes shown in the PR diff.
+
+          Do not invent problems.
+
+          Identify only actionable issues.
+
+          For every issue provide:
+
+          - Severity
+          - File
+          - Line
+          - Problem
+          - Why it matters
+          - Recommended fix
+
+          Severity levels:
+
+          CRITICAL
+          HIGH
+          MEDIUM
+          LOW
+
+          At the end provide:
+
+          ## Summary
+
+          Critical:
+          High:
+          Medium:
+          Low:
+
+          ## Final Recommendation
+
+          APPROVE
+
+          or
+
+          CHANGES REQUESTED
+
+          If there are no issues, clearly say:
+
+          No actionable issues found.
+          `;
+
+          async function main() {
+            const response = await fetch(
+              "https://api.openai.com/v1/responses",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+                },
+                body: JSON.stringify({
+                  model: "gpt-5.6",
+                  input: prompt
+                })
+              }
+            );
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(
+                `OpenAI API error ${response.status}: ${errorText}`
+              );
+            }
+
+            const data = await response.json();
+
+            const review = data.output_text;
+
+            if (!review) {
+              throw new Error("OpenAI returned an empty review.");
+            }
+
+            fs.writeFileSync(
+              "/tmp/review.txt",
+              review
+            );
+
+            console.log(review);
+          }
+
+          main().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Post review to Pull Request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr comment "$PR_NUMBER" \
+            --body-file /tmp/review.txt
