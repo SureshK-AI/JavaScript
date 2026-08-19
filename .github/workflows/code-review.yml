@@ -46,7 +46,7 @@ jobs:
           echo "PR diff:"
           wc -c /tmp/pr-diff.txt
 
-      - name: Run Gemini AI code review
+      - name: Run git show "$BASE_SHA:CODE_REVIEW.md"ni AI code review
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
