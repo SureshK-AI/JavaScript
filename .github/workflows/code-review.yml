@@ -280,15 +280,15 @@ jobs:
              * Create our own reliable machine-readable result.
              */
 
-            const reviewResult = `
-            === REVIEW_RESULT ===
-            Critical: ${critical}
-            High: ${high}
-            Medium: ${medium}
-            Low: ${low}
-            FINAL_RECOMMENDATION: ${recommendation}
-            === END_REVIEW_RESULT ===
-            `;
+            const reviewResult = [
+              "=== REVIEW_RESULT ===",
+              `Critical: ${critical}`,
+              `High: ${high}`,
+              `Medium: ${medium}`,
+              `Low: ${low}`,
+              `FINAL_RECOMMENDATION: ${recommendation}`,
+              "=== END_REVIEW_RESULT ==="
+            ].join("\n");
 
             /*
              * Preserve Gemini's detailed review and append
@@ -830,18 +830,18 @@ jobs:
           echo "----- Extracting controlled review result -----"
 
           RECOMMENDATION=$(awk '
-            /=== REVIEW_RESULT ===/ {
+            /^[[:space:]]*=== REVIEW_RESULT ===[[:space:]]*$/ {
               in_result=1
               next
             }
 
-            /=== END_REVIEW_RESULT ===/ {
+            /^[[:space:]]*=== END_REVIEW_RESULT ===[[:space:]]*$/ {
               in_result=0
               exit
             }
 
-            in_result && /^FINAL_RECOMMENDATION:/ {
-              sub(/^FINAL_RECOMMENDATION:[[:space:]]*/, "")
+            in_result && /^[[:space:]]*FINAL_RECOMMENDATION:/ {
+              sub(/^[[:space:]]*FINAL_RECOMMENDATION:[[:space:]]*/, "")
               print
               exit
             }
