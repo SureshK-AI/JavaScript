@@ -242,8 +242,12 @@ jobs:
             console.log("==========================");
             /*
              * ------------------------------------------------------------
-             * Read and validate Gemini's controlled REVIEW_RESULT block
+             * Read Gemini's controlled REVIEW_RESULT block
              * ------------------------------------------------------------
+             *
+             * Gemini is required to provide one machine-readable block.
+             * We validate that block and then create the ONLY authoritative
+             * result used by the rest of the workflow.
              */
 
             function extractReviewResult(reviewText) {
@@ -336,7 +340,9 @@ jobs:
             );
 
             /*
-             * Single source of truth for all downstream steps.
+             * Save the validated result as the single source of truth.
+             * Downstream steps must read this file instead of reparsing
+             * Gemini's natural-language review.
              */
 
             fs.writeFileSync(
@@ -358,6 +364,8 @@ jobs:
             console.log(`Low: ${result.low}`);
             console.log(`Recommendation: ${result.recommendation}`);
             console.log("=================================");
+
+          }
           main().catch(error => {
             console.error(error);
             process.exit(1);
