@@ -10,7 +10,7 @@ Promise completed successfully
 
 const promise = new Promise((resolve, reject) => {
     // TODO: Resolve after 2 seconds.
-    let success = false;
+    let success = true;
 
     setTimeout(() => {
 
