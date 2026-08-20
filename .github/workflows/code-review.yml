@@ -242,58 +242,89 @@ jobs:
             console.log("==========================");
             /*
              * ------------------------------------------------------------
-             * Generate reliable review result from Gemini review
+             * Read and validate Gemini's controlled REVIEW_RESULT block
              * ------------------------------------------------------------
-             *
-             * Gemini provides the detailed review.
-             * Node.js calculates the severity counts and recommendation.
-             * This prevents the workflow from depending on Gemini to
-             * produce an exact machine-readable block.
              */
 
-            function countSeverity(reviewText, severity) {
-              const regex = new RegExp(
-                `(?:\\*\\*)?Severity(?:\\*\\*)?\\s*:\\s*${severity}\\b`,
-                "gi"
+            function extractReviewResult(reviewText) {
+              const matches = [
+                ...reviewText.matchAll(
+                  /=== REVIEW_RESULT ===([\s\S]*?)=== END_REVIEW_RESULT ===/gi
+                )
+              ];
+
+              if (matches.length === 0) {
+                throw new Error(
+                  "Gemini review did not contain a valid REVIEW_RESULT block."
+                );
+              }
+
+              const block = matches[matches.length - 1][1];
+
+              function getCount(name) {
+                const match = block.match(
+                  new RegExp(`^\\s*${name}:\\s*(\\d+)\\s*$`, "im")
+                );
+
+                if (!match) {
+                  throw new Error(
+                    `Gemini REVIEW_RESULT is missing ${name} count.`
+                  );
+                }
+
+                return Number(match[1]);
+              }
+
+              const recommendationMatch = block.match(
+                /^\s*FINAL_RECOMMENDATION:\s*(APPROVE|CHANGES REQUESTED)\s*$/im
               );
 
-              return (reviewText.match(regex) || []).length;
+              if (!recommendationMatch) {
+                throw new Error(
+                  "Gemini REVIEW_RESULT is missing a valid FINAL_RECOMMENDATION."
+                );
+              }
+
+              const critical = getCount("Critical");
+              const high = getCount("High");
+              const medium = getCount("Medium");
+              const low = getCount("Low");
+
+              const calculatedRecommendation =
+                critical + high + medium + low > 0
+                  ? "CHANGES REQUESTED"
+                  : "APPROVE";
+
+              const declaredRecommendation = recommendationMatch[1];
+
+              if (declaredRecommendation !== calculatedRecommendation) {
+                throw new Error(
+                  `Gemini REVIEW_RESULT is inconsistent. ` +
+                  `Counts indicate "${calculatedRecommendation}" but Gemini declared ` +
+                  `"${declaredRecommendation}".`
+                );
+              }
+
+              return {
+                critical,
+                high,
+                medium,
+                low,
+                recommendation: calculatedRecommendation
+              };
             }
 
-            const critical = countSeverity(review, "CRITICAL");
-            const high = countSeverity(review, "HIGH");
-            const medium = countSeverity(review, "MEDIUM");
-            const low = countSeverity(review, "LOW");
-
-            const totalIssues =
-              critical +
-              high +
-              medium +
-              low;
-
-            const recommendation =
-              totalIssues > 0
-                ? "CHANGES REQUESTED"
-                : "APPROVE";
-
-            /*
-             * Create our own reliable machine-readable result.
-             */
+            const result = extractReviewResult(review);
 
             const reviewResult = [
               "=== REVIEW_RESULT ===",
-              `Critical: ${critical}`,
-              `High: ${high}`,
-              `Medium: ${medium}`,
-              `Low: ${low}`,
-              `FINAL_RECOMMENDATION: ${recommendation}`,
+              `Critical: ${result.critical}`,
+              `High: ${result.high}`,
+              `Medium: ${result.medium}`,
+              `Low: ${result.low}`,
+              `FINAL_RECOMMENDATION: ${result.recommendation}`,
               "=== END_REVIEW_RESULT ==="
             ].join("\n");
-
-            /*
-             * Preserve Gemini's detailed review and append
-             * our controlled result block.
-             */
 
             const normalizedReview =
               `${review}\n\n${reviewResult}`;
@@ -304,10 +335,29 @@ jobs:
               "utf8"
             );
 
-            console.log("===== AI CODE REVIEW =====");
-            console.log(normalizedReview);
-            console.log("==========================");
-          }
+            /*
+             * Single source of truth for all downstream steps.
+             */
+
+            fs.writeFileSync(
+              "/tmp/ai-review-result.json",
+              JSON.stringify(result, null, 2),
+              "utf8"
+            );
+
+            fs.writeFileSync(
+              "/tmp/ai-recommendation.txt",
+              result.recommendation,
+              "utf8"
+            );
+
+            console.log("===== AI CODE REVIEW RESULT =====");
+            console.log(`Critical: ${result.critical}`);
+            console.log(`High: ${result.high}`);
+            console.log(`Medium: ${result.medium}`);
+            console.log(`Low: ${result.low}`);
+            console.log(`Recommendation: ${result.recommendation}`);
+            console.log("=================================");
           main().catch(error => {
             console.error(error);
             process.exit(1);
@@ -352,36 +402,35 @@ jobs:
           }).format(new Date());
 
           // ---------------------------------------------------
-          // Extract severity counts from AI response
+          // Read the single validated AI review result
           // ---------------------------------------------------
 
-          function getCount(severity) {
-            const regex = new RegExp(
-              `^${severity}:\\s*(\\d+)`,
-              "im"
+          const result = JSON.parse(
+            fs.readFileSync("/tmp/ai-review-result.json", "utf8")
+          );
+
+          const critical = Number(result.critical);
+          const high = Number(result.high);
+          const medium = Number(result.medium);
+          const low = Number(result.low);
+          const recommendation = result.recommendation;
+
+          if (
+            !Number.isInteger(critical) ||
+            !Number.isInteger(high) ||
+            !Number.isInteger(medium) ||
+            !Number.isInteger(low) ||
+            !["APPROVE", "CHANGES REQUESTED"].includes(recommendation)
+          ) {
+            throw new Error(
+              "Invalid validated AI review result."
             );
-
-            const match = review.match(regex);
-
-            return match ? Number(match[1]) : 0;
           }
 
-          const critical = getCount("Critical");
-          const high = getCount("High");
-          const medium = getCount("Medium");
-          const low = getCount("Low");
-
-          // ---------------------------------------------------
-          // Determine final recommendation
-          // ---------------------------------------------------
-
-          let recommendation = "UNKNOWN";
-
-          if (/FINAL_RECOMMENDATION\s*:\s*CHANGES REQUESTED/i.test(review)) {
-            recommendation = "CHANGES REQUESTED";
-          } else if (/FINAL_RECOMMENDATION\s*:\s*APPROVE/i.test(review)) {
-            recommendation = "APPROVE";
-          }
+          console.log(
+            `Validated result: Critical=${critical}, High=${high}, ` +
+            `Medium=${medium}, Low=${low}, Recommendation=${recommendation}`
+          );
 
           // ---------------------------------------------------
           // HTML escaping
@@ -820,49 +869,33 @@ jobs:
         run: |
           echo "Checking AI review recommendation..."
 
-          REVIEW_FILE="/tmp/review.txt"
+          RESULT_FILE="/tmp/ai-recommendation.txt"
 
-          if [ ! -f "$REVIEW_FILE" ]; then
-            echo "❌ Review result file does not exist."
+          if [ ! -f "$RESULT_FILE" ]; then
+            echo "❌ Validated AI recommendation file does not exist."
             exit 1
           fi
 
-          echo "----- Extracting controlled review result -----"
-
-          RECOMMENDATION=$(awk '
-            /^[[:space:]]*=== REVIEW_RESULT ===[[:space:]]*$/ {
-              in_result=1
-              next
-            }
-
-            /^[[:space:]]*=== END_REVIEW_RESULT ===[[:space:]]*$/ {
-              in_result=0
-              exit
-            }
-
-            in_result && /^[[:space:]]*FINAL_RECOMMENDATION:/ {
-              sub(/^[[:space:]]*FINAL_RECOMMENDATION:[[:space:]]*/, "")
-              print
-              exit
-            }
-          ' "$REVIEW_FILE")
-
-          RECOMMENDATION=$(echo "$RECOMMENDATION" | tr -d '\r' | xargs)
+          RECOMMENDATION="$(cat "$RESULT_FILE" | tr -d '\r' | xargs)"
 
           echo "Final Recommendation: [$RECOMMENDATION]"
 
-          if [ "$RECOMMENDATION" = "CHANGES REQUESTED" ]; then
-            echo "❌ AI review requested changes."
-            echo "Pull Request cannot pass the AI quality gate."
-            exit 1
-          fi
+          case "$RECOMMENDATION" in
+            "APPROVE")
+              echo "✅ AI review approved the changes."
+              echo "AI quality gate passed."
+              exit 0
+              ;;
 
-          if [ "$RECOMMENDATION" = "APPROVE" ]; then
-            echo "✅ AI review approved the changes."
-            echo "AI quality gate passed."
-            exit 0
-          fi
+            "CHANGES REQUESTED")
+              echo "❌ AI review requested changes."
+              echo "Pull Request cannot pass the AI quality gate."
+              exit 1
+              ;;
 
-          echo "❌ AI review did not provide a valid recommendation."
-          echo "Expected: APPROVE or CHANGES REQUESTED"
-          exit 1
+            *)
+              echo "❌ Invalid AI review recommendation."
+              echo "Expected: APPROVE or CHANGES REQUESTED"
+              exit 1
+              ;;
+          esac
