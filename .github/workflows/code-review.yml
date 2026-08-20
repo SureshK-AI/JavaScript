@@ -228,7 +228,7 @@ jobs:
              * gemini-2.5-pro
              * if your project has usable Pro quota.
              */
-            const model = "gemini-2.5-flash";
+            const model = "gemini-3.6-flash";
 
             console.log(`Using Gemini model: ${model}`);
 
