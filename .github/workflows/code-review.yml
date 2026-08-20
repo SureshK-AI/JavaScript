@@ -240,88 +240,63 @@ jobs:
             console.log("===== AI CODE REVIEW =====");
             console.log(review);
             console.log("==========================");
-
             /*
-            * ------------------------------------------------------------
-            * Extract structured review result from Gemini response
-            * ------------------------------------------------------------
-            */
+             * ------------------------------------------------------------
+             * Generate reliable review result from Gemini review
+             * ------------------------------------------------------------
+             *
+             * Gemini provides the detailed review.
+             * Node.js calculates the severity counts and recommendation.
+             * This prevents the workflow from depending on Gemini to
+             * produce an exact machine-readable block.
+             */
 
-            const resultMatch = review.match(
-              /===\s*REVIEW_RESULT\s*===([\s\S]*?)===\s*END_REVIEW_RESULT\s*===/i
-            );
-
-            if (!resultMatch) {
-              throw new Error(
-                "Gemini response does not contain the required REVIEW_RESULT block."
+            function countSeverity(reviewText, severity) {
+              const regex = new RegExp(
+                `(?:\\*\\*)?Severity(?:\\*\\*)?\\s*:\\s*${severity}\\b`,
+                "gi"
               );
+
+              return (reviewText.match(regex) || []).length;
             }
 
-            const resultBlock = resultMatch[1];
+            const critical = countSeverity(review, "CRITICAL");
+            const high = countSeverity(review, "HIGH");
+            const medium = countSeverity(review, "MEDIUM");
+            const low = countSeverity(review, "LOW");
 
-            const criticalMatch = resultBlock.match(
-              /Critical\s*:\s*(\d+)/i
-            );
-
-            const highMatch = resultBlock.match(
-              /High\s*:\s*(\d+)/i
-            );
-
-            const mediumMatch = resultBlock.match(
-              /Medium\s*:\s*(\d+)/i
-            );
-
-            const lowMatch = resultBlock.match(
-              /Low\s*:\s*(\d+)/i
-            );
-
-            const recommendationMatch = resultBlock.match(
-              /FINAL_RECOMMENDATION\s*:\s*(APPROVE|CHANGES REQUESTED)/i
-            );
-
-            if (!criticalMatch ||
-                !highMatch ||
-                !mediumMatch ||
-                !lowMatch ||
-                !recommendationMatch) {
-
-              throw new Error(
-                "Gemini response contains an invalid REVIEW_RESULT block:\n" +
-                resultBlock
-              );
-            }
-
-            const critical = Number(criticalMatch[1]);
-            const high = Number(highMatch[1]);
-            const medium = Number(mediumMatch[1]);
-            const low = Number(lowMatch[1]);
+            const totalIssues =
+              critical +
+              high +
+              medium +
+              low;
 
             const recommendation =
-              recommendationMatch[1].toUpperCase();
+              totalIssues > 0
+                ? "CHANGES REQUESTED"
+                : "APPROVE";
 
             /*
-            * ------------------------------------------------------------
-            * Create normalized review file
-            *
-            * The detailed AI review is preserved.
-            * A clean summary is appended for downstream workflow steps.
-            * ------------------------------------------------------------
-            */
+             * Create our own reliable machine-readable result.
+             */
 
-            const normalizedReview = `${review}
+            const reviewResult = `
+            === REVIEW_RESULT ===
+            Critical: ${critical}
+            High: ${high}
+            Medium: ${medium}
+            Low: ${low}
+            FINAL_RECOMMENDATION: ${recommendation}
+            === END_REVIEW_RESULT ===
+            `;
 
-          ============================================================
-          NORMALIZED REVIEW RESULT
-          ============================================================
+            /*
+             * Preserve Gemini's detailed review and append
+             * our controlled result block.
+             */
 
-          Critical: ${critical}
-          High: ${high}
-          Medium: ${medium}
-          Low: ${low}
-          Recommendation: ${recommendation}
-
-          ============================================================
-          `;
+            const normalizedReview =
+              `${review}\n\n${reviewResult}`;
 
             fs.writeFileSync(
               "/tmp/review.txt",
@@ -329,17 +304,9 @@ jobs:
               "utf8"
             );
 
-            /*
-            * GitHub Actions output
-            */
-
-            console.log("===== NORMALIZED REVIEW RESULT =====");
-            console.log(`Critical: ${critical}`);
-            console.log(`High: ${high}`);
-            console.log(`Medium: ${medium}`);
-            console.log(`Low: ${low}`);
-            console.log(`Recommendation: ${recommendation}`);
-            console.log("====================================");
+            console.log("===== AI CODE REVIEW =====");
+            console.log(normalizedReview);
+            console.log("==========================");
           }
           main().catch(error => {
             console.error(error);
@@ -410,9 +377,9 @@ jobs:
 
           let recommendation = "UNKNOWN";
 
-          if (/FINAL RECOMMENDATION[\s\S]*CHANGES REQUESTED/i.test(review)) {
+          if (/FINAL_RECOMMENDATION\s*:\s*CHANGES REQUESTED/i.test(review)) {
             recommendation = "CHANGES REQUESTED";
-          } else if (/FINAL RECOMMENDATION[\s\S]*APPROVE/i.test(review)) {
+          } else if (/FINAL_RECOMMENDATION\s*:\s*APPROVE/i.test(review)) {
             recommendation = "APPROVE";
           }
 
