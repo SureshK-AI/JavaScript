@@ -46,7 +46,8 @@ jobs:
           echo "PR diff:"
           wc -c /tmp/pr-diff.txt
 
-      - name: Run git show "$BASE_SHA:CODE_REVIEW.md"ni AI code review
+      - name: Run AI code review
+        id: review
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
@@ -248,12 +249,525 @@ jobs:
             console.error(error);
             process.exit(1);
           });
+            NODE
+          - name: Post review to Pull Request
+            env:
+              GH_TOKEN: ${{ github.token }}
+              PR_NUMBER: ${{ github.event.pull_request.number }}
+            run: |
+              gh pr comment "$PR_NUMBER" \
+                --body-file /tmp/review.txt
+
+      # ---------------------------------------------------------
+      # Prepare AI review summary and detailed HTML report
+      # ---------------------------------------------------------
+      - name: Generate AI review email report
+        if: steps.review.outcome == 'success'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_OWNER: ${{ github.event.pull_request.user.login }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+
+          const review = fs.readFileSync("/tmp/review.txt", "utf8");
+
+          const prNumber = process.env.PR_NUMBER;
+          const prUrl = process.env.PR_URL;
+          const prOwner = process.env.PR_OWNER;
+          const repository = process.env.REPOSITORY;
+          const headSha = process.env.HEAD_SHA;
+
+          // India Standard Time
+          const reviewDateTime = new Intl.DateTimeFormat("en-IN", {
+            timeZone: "Asia/Kolkata",
+            dateStyle: "medium",
+            timeStyle: "medium"
+          }).format(new Date());
+
+          // ---------------------------------------------------
+          // Extract severity counts from AI response
+          // ---------------------------------------------------
+
+          function getCount(severity) {
+            const regex = new RegExp(
+              `^${severity}:\\s*(\\d+)`,
+              "im"
+            );
+
+            const match = review.match(regex);
+
+            return match ? Number(match[1]) : 0;
+          }
+
+          const critical = getCount("Critical");
+          const high = getCount("High");
+          const medium = getCount("Medium");
+          const low = getCount("Low");
+
+          // ---------------------------------------------------
+          // Determine final recommendation
+          // ---------------------------------------------------
+
+          let recommendation = "UNKNOWN";
+
+          if (/FINAL RECOMMENDATION[\s\S]*CHANGES REQUESTED/i.test(review)) {
+            recommendation = "CHANGES REQUESTED";
+          } else if (/FINAL RECOMMENDATION[\s\S]*APPROVE/i.test(review)) {
+            recommendation = "APPROVE";
+          }
+
+          // ---------------------------------------------------
+          // HTML escaping
+          // ---------------------------------------------------
+
+          function escapeHtml(value) {
+            return value
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+          }
+
+          const escapedReview = escapeHtml(review);
+
+          // Preserve line breaks in detailed review
+          const formattedReview = escapedReview
+            .replace(/\n/g, "<br>");
+
+          // ---------------------------------------------------
+          // Recommendation styling
+          // ---------------------------------------------------
+
+          const recommendationColor =
+            recommendation === "APPROVE"
+              ? "#198754"
+              : "#dc3545";
+
+          // ---------------------------------------------------
+          // Generate detailed HTML attachment
+          // ---------------------------------------------------
+
+          const detailedHtml = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+
+            <title>AI Code Review - PR #${prNumber}</title>
+
+            <style>
+
+              body {
+                font-family: Arial, Helvetica, sans-serif;
+                background: #f4f6f8;
+                margin: 0;
+                padding: 30px;
+                color: #212529;
+              }
+
+              .container {
+                max-width: 1000px;
+                margin: auto;
+                background: white;
+                padding: 35px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+              }
+
+              h1 {
+                margin-top: 0;
+              }
+
+              .metadata {
+                background: #f8f9fa;
+                padding: 20px;
+                border-radius: 6px;
+                margin-bottom: 25px;
+              }
+
+              .metadata table {
+                width: 100%;
+                border-collapse: collapse;
+              }
+
+              .metadata td {
+                padding: 8px;
+                border-bottom: 1px solid #dee2e6;
+              }
+
+              .label {
+                font-weight: bold;
+                width: 180px;
+              }
+
+              .summary {
+                display: flex;
+                gap: 15px;
+                margin: 20px 0;
+              }
+
+              .severity {
+                flex: 1;
+                padding: 18px;
+                border-radius: 6px;
+                text-align: center;
+                font-weight: bold;
+                background: #f8f9fa;
+              }
+
+              .recommendation {
+                padding: 18px;
+                color: white;
+                background: ${recommendationColor};
+                border-radius: 6px;
+                font-size: 18px;
+                font-weight: bold;
+                margin: 25px 0;
+              }
+
+              .review {
+                background: #f8f9fa;
+                padding: 25px;
+                border-radius: 6px;
+                line-height: 1.6;
+                white-space: normal;
+              }
+
+              a {
+                color: #0969da;
+                text-decoration: none;
+              }
+
+              .footer {
+                margin-top: 30px;
+                color: #6c757d;
+                font-size: 13px;
+              }
+
+            </style>
+          </head>
+
+          <body>
+
+            <div class="container">
+
+              <h1>AI Code Review Report</h1>
+
+              <div class="metadata">
+
+                <table>
+
+                  <tr>
+                    <td class="label">Repository</td>
+                    <td>${escapeHtml(repository)}</td>
+                  </tr>
+
+                  <tr>
+                    <td class="label">Pull Request</td>
+                    <td>#${escapeHtml(prNumber)}</td>
+                  </tr>
+
+                  <tr>
+                    <td class="label">PR Owner</td>
+                    <td>${escapeHtml(prOwner)}</td>
+                  </tr>
+
+                  <tr>
+                    <td class="label">Review Date/Time</td>
+                    <td>${escapeHtml(reviewDateTime)} IST</td>
+                  </tr>
+
+                  <tr>
+                    <td class="label">AI Model</td>
+                    <td>Gemini 3.6 Flash</td>
+                  </tr>
+
+                  <tr>
+                    <td class="label">Commit</td>
+                    <td>${escapeHtml(headSha)}</td>
+                  </tr>
+
+                  <tr>
+                    <td class="label">Pull Request</td>
+                    <td>
+                      <a href="${escapeHtml(prUrl)}">
+                        Open Pull Request
+                      </a>
+                    </td>
+                  </tr>
+
+                </table>
+
+              </div>
+
+              <h2>Review Summary</h2>
+
+              <div class="summary">
+
+                <div class="severity">
+                  Critical<br>
+                  ${critical}
+                </div>
+
+                <div class="severity">
+                  High<br>
+                  ${high}
+                </div>
+
+                <div class="severity">
+                  Medium<br>
+                  ${medium}
+                </div>
+
+                <div class="severity">
+                  Low<br>
+                  ${low}
+                </div>
+
+              </div>
+
+              <div class="recommendation">
+
+                Final Recommendation:
+                ${escapeHtml(recommendation)}
+
+              </div>
+
+              <h2>Detailed AI Review</h2>
+
+              <div class="review">
+
+                ${formattedReview}
+
+              </div>
+
+              <div class="footer">
+
+                Generated automatically by GitHub Actions
+                AI Code Review workflow.
+
+              </div>
+
+            </div>
+
+          </body>
+          </html>
+          `;
+
+          const htmlFile =
+            `/tmp/AI_Code_Review_PR_${prNumber}.html`;
+
+          fs.writeFileSync(
+            htmlFile,
+            detailedHtml
+          );
+
+          // ---------------------------------------------------
+          // Generate HTML email body
+          // ---------------------------------------------------
+
+          const emailHtml = `
+          <!DOCTYPE html>
+
+          <html>
+
+          <body style="
+            font-family: Arial, Helvetica, sans-serif;
+            color: #212529;
+          ">
+
+            <h2>AI Code Review</h2>
+
+            <table
+              cellpadding="8"
+              cellspacing="0"
+              style="border-collapse: collapse;"
+            >
+
+              <tr>
+                <td><b>Repository</b></td>
+                <td>${escapeHtml(repository)}</td>
+              </tr>
+
+              <tr>
+                <td><b>Pull Request</b></td>
+                <td>#${escapeHtml(prNumber)}</td>
+              </tr>
+
+              <tr>
+                <td><b>PR Owner</b></td>
+                <td>${escapeHtml(prOwner)}</td>
+              </tr>
+
+              <tr>
+                <td><b>Review Date/Time</b></td>
+                <td>${escapeHtml(reviewDateTime)} IST</td>
+              </tr>
+
+              <tr>
+                <td><b>AI Model</b></td>
+                <td>Gemini 3.6 Flash</td>
+              </tr>
+
+            </table>
+
+            <hr>
+
+            <h3>Review Summary</h3>
+
+            <table
+              cellpadding="12"
+              cellspacing="0"
+              border="1"
+              style="border-collapse: collapse;"
+            >
+
+              <tr>
+                <th>Critical</th>
+                <th>High</th>
+                <th>Medium</th>
+                <th>Low</th>
+              </tr>
+
+              <tr align="center">
+
+                <td>${critical}</td>
+                <td>${high}</td>
+                <td>${medium}</td>
+                <td>${low}</td>
+
+              </tr>
+
+            </table>
+
+            <h3>
+              Final Recommendation:
+              <span style="color:${recommendationColor};">
+                ${escapeHtml(recommendation)}
+              </span>
+            </h3>
+
+            <p>
+
+              <a
+                href="${escapeHtml(prUrl)}"
+                style="
+                  display:inline-block;
+                  padding:10px 16px;
+                  background:#0969da;
+                  color:white;
+                  text-decoration:none;
+                  border-radius:5px;
+                "
+              >
+                View Pull Request
+              </a>
+
+            </p>
+
+            <p>
+
+              The complete AI code review is attached
+              as an HTML report.
+
+            </p>
+
+            <hr>
+
+            <p style="font-size:12px;color:#6c757d;">
+
+              This email was automatically generated by
+              the AI Code Review GitHub Actions workflow.
+
+            </p>
+
+          </body>
+
+          </html>
+          `;
+
+          fs.writeFileSync(
+            "/tmp/email-body.html",
+            emailHtml
+          );
+
+          console.log(
+            `Critical: ${critical}`
+          );
+
+          console.log(
+            `High: ${high}`
+          );
+
+          console.log(
+            `Medium: ${medium}`
+          );
+
+          console.log(
+            `Low: ${low}`
+          );
+
+          console.log(
+            `Recommendation: ${recommendation}`
+          );
+
+          console.log(
+            `HTML report: ${htmlFile}`
+          );
+
           NODE
 
-      - name: Post review to Pull Request
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+      # ---------------------------------------------------------
+      # Send email notification
+      # ---------------------------------------------------------
+      - name: Send AI review email
+        if: steps.review.outcome == 'success'
+        uses: dawidd6/action-send-mail@v18
+        with:
+        server_address: smtp.gmail.com
+        server_port: 465
+        secure: true
+
+        username: ${{ secrets.GMAIL_USERNAME }}
+        password: ${{ secrets.GMAIL_APP_PASSWORD }}
+
+        from: ${{ secrets.GMAIL_USERNAME }}
+        to: ${{ secrets.REVIEW_EMAIL_TO }}
+
+        subject: >-
+          AI Code Review |
+          PR #${{ github.event.pull_request.number }} |
+          ${{ github.repository }}
+
+        html_body: file:///tmp/email-body.html
+
+        attachments: >-
+          /tmp/AI_Code_Review_PR_${{ github.event.pull_request.number }}.html
+
+        priority: high
+      # ---------------------------------------------------------
+      # AI Quality Gate
+      # ---------------------------------------------------------
+      - name: Enforce AI review quality gate
         run: |
-          gh pr comment "$PR_NUMBER" \
-            --body-file /tmp/review.txt
+          echo "Checking AI review recommendation..."
+
+          if grep -q "CHANGES REQUESTED" /tmp/review.txt; then
+            echo "❌ AI review requested changes."
+            echo "Pull Request cannot pass the AI quality gate."
+            exit 1
+          fi
+
+          if grep -q "APPROVE" /tmp/review.txt; then
+            echo "✅ AI review approved the changes."
+            echo "AI quality gate passed."
+            exit 0
+          fi
+
+          echo "❌ AI review did not provide a valid recommendation."
+          exit 1
