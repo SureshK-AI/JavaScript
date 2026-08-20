@@ -76,8 +76,38 @@ jobs:
           const prompt = `
           You are a senior software engineer and expert code reviewer.
 
-          Your job is to review the Pull Request changes using the
-          repository's CODE_REVIEW.md rules.
+          Review ONLY the Pull Request changes provided below using the repository's
+          CODE_REVIEW.md rules.
+
+          Do not invent issues.
+
+          Do not criticize unchanged code unless the changed code directly introduces
+          or depends on the problem.
+
+          Focus only on real, actionable issues.
+
+          For every real issue, provide:
+          - severity
+          - file
+          - line
+          - problem
+          - why_it_matters
+          - recommended_fix
+
+          Severity must be exactly one of:
+          CRITICAL
+          HIGH
+          MEDIUM
+          LOW
+
+          If there are no real actionable issues, return an empty issues array.
+
+          IMPORTANT:
+          Return ONLY the requested JSON object.
+          Do not return Markdown.
+          Do not return explanations outside the JSON.
+          Do not return code fences.
+          Do not return a REVIEW_RESULT block.
 
           ============================================================
           CODE REVIEW RULES
@@ -90,78 +120,6 @@ jobs:
           ============================================================
 
           ${diff}
-
-          ============================================================
-          REVIEW REQUIREMENTS
-          ============================================================
-
-          Review ONLY the code shown in the Pull Request diff.
-
-          Do not invent issues.
-
-          Do not criticize code that was not changed unless the changed
-          code directly introduces or depends on the problem.
-
-          Focus on actionable issues.
-
-          Pay special attention to:
-
-          1. Correctness
-          2. Bugs
-          3. JavaScript quality
-          4. Playwright test reliability
-          5. Async/await and Promise handling
-          6. Locators and test stability
-          7. Assertions
-          8. API testing
-          9. Error handling
-          10. Security
-          11. Hard-coded credentials or secrets
-          12. Duplicate code
-          13. Maintainability
-          14. Performance
-          15. Flaky test risks
-
-          Severity levels:
-
-          CRITICAL
-          HIGH
-          MEDIUM
-          LOW
-
-          Only report a severity when there is a real actionable issue.
-
-          For every issue provide:
-
-          - Severity
-          - File
-          - Line
-          - Problem
-          - Why it matters
-          - Recommended fix
-
-          If the code is good, do NOT manufacture issues.
-
-          At the end provide:
-
-          ## Summary
-
-          Critical: <number>
-          High: <number>
-          Medium: <number>
-          Low: <number>
-
-          ## Final Recommendation
-
-          APPROVE
-
-          or
-
-          CHANGES REQUESTED
-
-          If no actionable problems are found, say:
-
-          No actionable issues found.
           `;
 
           async function callGemini(model) {
@@ -186,7 +144,54 @@ jobs:
                 ],
                 generationConfig: {
                   temperature: 0.1,
-                  maxOutputTokens: 5000
+                  maxOutputTokens: 8000,
+                  responseMimeType: "application/json",
+                  responseSchema: {
+                    type: "OBJECT",
+                    properties: {
+                      issues: {
+                        type: "ARRAY",
+                        items: {
+                          type: "OBJECT",
+                          properties: {
+                            severity: {
+                              type: "STRING",
+                              enum: [
+                                "CRITICAL",
+                                "HIGH",
+                                "MEDIUM",
+                                "LOW"
+                              ]
+                            },
+                            file: {
+                              type: "STRING"
+                            },
+                            line: {
+                              type: "INTEGER"
+                            },
+                            problem: {
+                              type: "STRING"
+                            },
+                            why_it_matters: {
+                              type: "STRING"
+                            },
+                            recommended_fix: {
+                              type: "STRING"
+                            }
+                          },
+                          required: [
+                            "severity",
+                            "file",
+                            "line",
+                            "problem",
+                            "why_it_matters",
+                            "recommended_fix"
+                          ]
+                        }
+                      }
+                    },
+                    required: ["issues"]
+                  }
                 }
               })
             });
@@ -207,11 +212,27 @@ jobs:
 
             if (!text) {
               throw new Error(
-                `Gemini returned no review text: ${JSON.stringify(data)}`
+                `Gemini returned no structured review: ${JSON.stringify(data)}`
               );
             }
 
-            return text;
+            let result;
+
+            try {
+              result = JSON.parse(text);
+            } catch (error) {
+              throw new Error(
+                `Gemini returned invalid JSON: ${text}`
+              );
+            }
+
+            if (!result || !Array.isArray(result.issues)) {
+              throw new Error(
+                "Gemini structured response does not contain an issues array."
+              );
+            }
+
+            return result;
           }
 
           async function main() {
@@ -221,30 +242,170 @@ jobs:
               );
             }
 
-            /*
-             * Start with Flash because it is suitable for the first
-             * free-tier test and generally has more accessible quota.
-             *
-             * We can change this later to:
-             * gemini-2.5-pro
-             * if your project has usable Pro quota.
-             */
             const model = "gemini-3.6-flash";
 
             console.log(`Using Gemini model: ${model}`);
 
-            const review = await callGemini(model);
+            const aiResult = await callGemini(model);
+
+            console.log("===== AI STRUCTURED RESPONSE =====");
+            console.log(JSON.stringify(aiResult, null, 2));
+            console.log("==========================");
+            /*
+             * ------------------------------------------------------------
+             * Validate structured Gemini result
+             * ------------------------------------------------------------
+             */
+
+            const allowedSeverities = new Set([
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ]);
+
+            for (const issue of aiResult.issues) {
+              if (!issue || typeof issue !== "object") {
+                throw new Error("Gemini returned an invalid issue.");
+              }
+
+              if (!allowedSeverities.has(issue.severity)) {
+                throw new Error(
+                  `Invalid severity returned by Gemini: ${issue.severity}`
+                );
+              }
+
+              if (
+                typeof issue.file !== "string" ||
+                typeof issue.line !== "number" ||
+                !Number.isInteger(issue.line) ||
+                typeof issue.problem !== "string" ||
+                typeof issue.why_it_matters !== "string" ||
+                typeof issue.recommended_fix !== "string"
+              ) {
+                throw new Error(
+                  "Gemini returned an issue with missing or invalid fields."
+                );
+              }
+            }
+
+            /*
+             * ------------------------------------------------------------
+             * Calculate counts from structured issues
+             * ------------------------------------------------------------
+             */
+
+            const critical = aiResult.issues.filter(
+              issue => issue.severity === "CRITICAL"
+            ).length;
+
+            const high = aiResult.issues.filter(
+              issue => issue.severity === "HIGH"
+            ).length;
+
+            const medium = aiResult.issues.filter(
+              issue => issue.severity === "MEDIUM"
+            ).length;
+
+            const low = aiResult.issues.filter(
+              issue => issue.severity === "LOW"
+            ).length;
+
+            const recommendation =
+              aiResult.issues.length > 0
+                ? "CHANGES REQUESTED"
+                : "APPROVE";
+
+            /*
+             * ------------------------------------------------------------
+             * Build human-readable review
+             * ------------------------------------------------------------
+             */
+
+            let review = "";
+
+            if (aiResult.issues.length === 0) {
+              review = "No actionable issues found.";
+            } else {
+              review = aiResult.issues
+                .map((issue, index) => {
+                  return [
+                    `## Issue ${index + 1}`,
+                    "",
+                    `**Severity:** ${issue.severity}`,
+                    `**File:** ${issue.file}`,
+                    `**Line:** ${issue.line}`,
+                    "",
+                    `**Problem:** ${issue.problem}`,
+                    "",
+                    `**Why it matters:** ${issue.why_it_matters}`,
+                    "",
+                    `**Recommended fix:** ${issue.recommended_fix}`
+                  ].join("\n");
+                })
+                .join("\n\n");
+            }
+
+            /*
+             * ------------------------------------------------------------
+             * Create ONE controlled result
+             * ------------------------------------------------------------
+             */
+
+            const reviewResult = [
+              "=== REVIEW_RESULT ===",
+              `Critical: ${critical}`,
+              `High: ${high}`,
+              `Medium: ${medium}`,
+              `Low: ${low}`,
+              `FINAL_RECOMMENDATION: ${recommendation}`,
+              "=== END_REVIEW_RESULT ==="
+            ].join("\n");
+
+            const normalizedReview =
+              `${review}\n\n${reviewResult}`;
 
             fs.writeFileSync(
               "/tmp/review.txt",
-              review
+              normalizedReview,
+              "utf8"
+            );
+
+            fs.writeFileSync(
+              "/tmp/ai-review-result.json",
+              JSON.stringify(
+                {
+                  critical,
+                  high,
+                  medium,
+                  low,
+                  recommendation
+                },
+                null,
+                2
+              ),
+              "utf8"
+            );
+
+            fs.writeFileSync(
+              "/tmp/ai-recommendation.txt",
+              recommendation,
+              "utf8"
             );
 
             console.log("===== AI CODE REVIEW =====");
             console.log(review);
             console.log("==========================");
-          }
 
+            console.log("===== AI CODE REVIEW RESULT =====");
+            console.log(`Critical: ${critical}`);
+            console.log(`High: ${high}`);
+            console.log(`Medium: ${medium}`);
+            console.log(`Low: ${low}`);
+            console.log(`Recommendation: ${recommendation}`);
+            console.log("=================================");
+
+          }
           main().catch(error => {
             console.error(error);
             process.exit(1);
@@ -289,36 +450,35 @@ jobs:
           }).format(new Date());
 
           // ---------------------------------------------------
-          // Extract severity counts from AI response
+          // Read the single validated AI review result
           // ---------------------------------------------------
 
-          function getCount(severity) {
-            const regex = new RegExp(
-              `^${severity}:\\s*(\\d+)`,
-              "im"
+          const result = JSON.parse(
+            fs.readFileSync("/tmp/ai-review-result.json", "utf8")
+          );
+
+          const critical = Number(result.critical);
+          const high = Number(result.high);
+          const medium = Number(result.medium);
+          const low = Number(result.low);
+          const recommendation = result.recommendation;
+
+          if (
+            !Number.isInteger(critical) ||
+            !Number.isInteger(high) ||
+            !Number.isInteger(medium) ||
+            !Number.isInteger(low) ||
+            !["APPROVE", "CHANGES REQUESTED"].includes(recommendation)
+          ) {
+            throw new Error(
+              "Invalid validated AI review result."
             );
-
-            const match = review.match(regex);
-
-            return match ? Number(match[1]) : 0;
           }
 
-          const critical = getCount("Critical");
-          const high = getCount("High");
-          const medium = getCount("Medium");
-          const low = getCount("Low");
-
-          // ---------------------------------------------------
-          // Determine final recommendation
-          // ---------------------------------------------------
-
-          let recommendation = "UNKNOWN";
-
-          if (/FINAL RECOMMENDATION[\s\S]*CHANGES REQUESTED/i.test(review)) {
-            recommendation = "CHANGES REQUESTED";
-          } else if (/FINAL RECOMMENDATION[\s\S]*APPROVE/i.test(review)) {
-            recommendation = "APPROVE";
-          }
+          console.log(
+            `Validated result: Critical=${critical}, High=${high}, ` +
+            `Medium=${medium}, Low=${low}, Recommendation=${recommendation}`
+          );
 
           // ---------------------------------------------------
           // HTML escaping
@@ -757,17 +917,33 @@ jobs:
         run: |
           echo "Checking AI review recommendation..."
 
-          if grep -q "CHANGES REQUESTED" /tmp/review.txt; then
-            echo "❌ AI review requested changes."
-            echo "Pull Request cannot pass the AI quality gate."
+          RESULT_FILE="/tmp/ai-recommendation.txt"
+
+          if [ ! -f "$RESULT_FILE" ]; then
+            echo "❌ Validated AI recommendation file does not exist."
             exit 1
           fi
 
-          if grep -q "APPROVE" /tmp/review.txt; then
-            echo "✅ AI review approved the changes."
-            echo "AI quality gate passed."
-            exit 0
-          fi
+          RECOMMENDATION="$(cat "$RESULT_FILE" | tr -d '\r' | xargs)"
 
-          echo "❌ AI review did not provide a valid recommendation."
-          exit 1
+          echo "Final Recommendation: [$RECOMMENDATION]"
+
+          case "$RECOMMENDATION" in
+            "APPROVE")
+              echo "✅ AI review approved the changes."
+              echo "AI quality gate passed."
+              exit 0
+              ;;
+
+            "CHANGES REQUESTED")
+              echo "❌ AI review requested changes."
+              echo "Pull Request cannot pass the AI quality gate."
+              exit 1
+              ;;
+
+            *)
+              echo "❌ Invalid AI review recommendation."
+              echo "Expected: APPROVE or CHANGES REQUESTED"
+              exit 1
+              ;;
+          esac

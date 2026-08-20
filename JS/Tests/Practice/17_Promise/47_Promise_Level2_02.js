@@ -28,3 +28,16 @@ function generateReport() {
 }
 
 // TODO: Build the complete .then() chain and .catch().
+login()
+.then(function (msg){
+    console.log(msg);
+    return getUser();
+}).then(function(msg){
+    console.log(msg);
+    return getOrders();
+}).then(function(msg) {
+    console.log(msg);
+    return generateReport()
+}).then(function(msg) {
+    console.log(msg);
+})

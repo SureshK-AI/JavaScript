@@ -11,6 +11,7 @@ Create getUser() that resolves with a username.
 function getUser() {
     return new Promise((resolve, reject) => {
         // TODO: Resolve with "Suresh".
+        resolve("Suresh");
     });
 }
 

@@ -8,7 +8,7 @@ Example 2
 Input: racecar
 Output: YES */
 
-let inpWord = "madam";
+let inpWord = "madamS";
 let len = inpWord.length;
 let isPo = true;
 
@@ -18,7 +18,6 @@ for (let i=0; i <= inpWord.length/2;i++){
     isPo = false;
     break;
  }
- len--;
 }
 
 if (isPo) {

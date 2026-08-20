@@ -11,6 +11,14 @@ password = 1234
 
 function login(username, password) {
     // TODO: Return Promise.
+    return new Promise((resolve, reject) => {
+    if (username === "admin" && password==="1234"){
+        resolve("Correct credentials");
+    }
+    else {
+        reject("Wrong Credentials");
+    }
+})
 }
 
 login("admin", "1234")

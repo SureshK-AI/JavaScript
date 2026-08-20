@@ -13,7 +13,10 @@ Expected:
 */
 
 function processNumbers(numbers, callback) {
-    // TODO: Execute callback for every number.
+    // Execute callback for every number
+    for (let num of numbers) {
+        callback(num);
+    }
 }
 
 processNumbers([1, 2, 3, 4, 5], function (num) {
