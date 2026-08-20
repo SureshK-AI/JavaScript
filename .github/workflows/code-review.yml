@@ -249,14 +249,14 @@ jobs:
             console.error(error);
             process.exit(1);
           });
-            NODE
-          - name: Post review to Pull Request
-            env:
-              GH_TOKEN: ${{ github.token }}
-              PR_NUMBER: ${{ github.event.pull_request.number }}
-            run: |
-              gh pr comment "$PR_NUMBER" \
-                --body-file /tmp/review.txt
+          NODE
+      - name: Post review to Pull Request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr comment "$PR_NUMBER" \
+            --body-file /tmp/review.txt
 
       # ---------------------------------------------------------
       # Prepare AI review summary and detailed HTML report
