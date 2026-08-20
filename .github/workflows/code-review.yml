@@ -729,27 +729,27 @@ jobs:
         if: steps.review.outcome == 'success'
         uses: dawidd6/action-send-mail@v18
         with:
-        server_address: smtp.gmail.com
-        server_port: 465
-        secure: true
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
 
-        username: ${{ secrets.GMAIL_USERNAME }}
-        password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          username: ${{ secrets.GMAIL_USERNAME }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
 
-        from: ${{ secrets.GMAIL_USERNAME }}
-        to: ${{ secrets.REVIEW_EMAIL_TO }}
+          from: ${{ secrets.GMAIL_USERNAME }}
+          to: ${{ secrets.REVIEW_EMAIL_TO }}
 
-        subject: >-
-          AI Code Review |
-          PR #${{ github.event.pull_request.number }} |
-          ${{ github.repository }}
+          subject: >
+            AI Code Review |
+            PR #${{ github.event.pull_request.number }} |
+            ${{ github.repository }}
 
-        html_body: file:///tmp/email-body.html
+          html_body: file:///tmp/email-body.html
 
-        attachments: >-
-          /tmp/AI_Code_Review_PR_${{ github.event.pull_request.number }}.html
+          attachments: >
+            /tmp/AI_Code_Review_PR_${{ github.event.pull_request.number }}.html
 
-        priority: high
+          priority: high
       # ---------------------------------------------------------
       # AI Quality Gate
       # ---------------------------------------------------------
