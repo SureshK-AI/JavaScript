@@ -820,17 +820,49 @@ jobs:
         run: |
           echo "Checking AI review recommendation..."
 
-          if grep -q "CHANGES REQUESTED" /tmp/review.txt; then
+          REVIEW_FILE="/tmp/review.txt"
+
+          if [ ! -f "$REVIEW_FILE" ]; then
+            echo "❌ Review result file does not exist."
+            exit 1
+          fi
+
+          echo "----- Extracting controlled review result -----"
+
+          RECOMMENDATION=$(awk '
+            /=== REVIEW_RESULT ===/ {
+              in_result=1
+              next
+            }
+
+            /=== END_REVIEW_RESULT ===/ {
+              in_result=0
+              exit
+            }
+
+            in_result && /^FINAL_RECOMMENDATION:/ {
+              sub(/^FINAL_RECOMMENDATION:[[:space:]]*/, "")
+              print
+              exit
+            }
+          ' "$REVIEW_FILE")
+
+          RECOMMENDATION=$(echo "$RECOMMENDATION" | tr -d '\r' | xargs)
+
+          echo "Final Recommendation: [$RECOMMENDATION]"
+
+          if [ "$RECOMMENDATION" = "CHANGES REQUESTED" ]; then
             echo "❌ AI review requested changes."
             echo "Pull Request cannot pass the AI quality gate."
             exit 1
           fi
 
-          if grep -q "APPROVE" /tmp/review.txt; then
+          if [ "$RECOMMENDATION" = "APPROVE" ]; then
             echo "✅ AI review approved the changes."
             echo "AI quality gate passed."
             exit 0
           fi
 
           echo "❌ AI review did not provide a valid recommendation."
+          echo "Expected: APPROVE or CHANGES REQUESTED"
           exit 1
