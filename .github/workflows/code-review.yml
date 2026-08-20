@@ -142,38 +142,35 @@ jobs:
 
           If the code is good, do NOT manufacture issues.
 
-          At the end provide:
+          At the end of your review, ALWAYS provide this exact
+          machine-readable block.
 
-          At the end of your review, ALWAYS provide this exact machine-readable block.
+          IMPORTANT:
+          - Replace every value with the actual count of issues found.
+          - NEVER output <number>.
+          - NEVER output placeholder text.
+          - The counts must represent the actual issues reported above.
+          - FINAL_RECOMMENDATION must be exactly APPROVE or CHANGES REQUESTED.
+          - Do not use UNKNOWN.
+          - Do not omit FINAL_RECOMMENDATION.
 
           === REVIEW_RESULT ===
-          Critical: <number>
-          High: <number>
-          Medium: <number>
-          Low: <number>
+          Critical: 0
+          High: 0
+          Medium: 0
+          Low: 0
           FINAL_RECOMMENDATION: APPROVE
           === END_REVIEW_RESULT ===
 
-          The FINAL_RECOMMENDATION value MUST be exactly one of:
+          Rules for FINAL_RECOMMENDATION:
 
-          APPROVE
+          - If there is at least one actionable issue, use:
+            FINAL_RECOMMENDATION: CHANGES REQUESTED
 
-          or
+          - If there are no actionable issues, use:
+            FINAL_RECOMMENDATION: APPROVE
 
-          CHANGES REQUESTED
-
-          If there are any actionable issues, use:
-
-          FINAL_RECOMMENDATION: CHANGES REQUESTED
-
-          If there are no actionable issues, use:
-
-          FINAL_RECOMMENDATION: APPROVE
-
-          Do not use UNKNOWN.
-          Do not omit FINAL_RECOMMENDATION.
-
-          If no actionable problems are found, say:
+          If no actionable problems are found, also say:
 
           No actionable issues found.
           `;
