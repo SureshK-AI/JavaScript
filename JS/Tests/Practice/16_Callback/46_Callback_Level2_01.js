@@ -10,7 +10,16 @@ Expected:
 */
 
 function filterNumbers(numbers, callback) {
-    // TODO: Build and return a new array based on callback result.
+    // Build and return a new array based on callback result.
+    let result = [];
+
+    for (let num of numbers) {
+        if (callback(num)) {
+            result.push(num);
+        }
+    }
+
+    return result;
 }
 
 const result = filterNumbers([10, 15, 20, 25, 30], function (num) {

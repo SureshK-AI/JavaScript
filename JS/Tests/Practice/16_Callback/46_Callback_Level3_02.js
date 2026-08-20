@@ -51,3 +51,29 @@ function generateReport(callback) {
 }
 
 // TODO: Create the nested callback chain.
+login(function () {
+    getUser(function () {
+        getOrders(function () {
+            getPayment(function () {
+                generateReport(function () {
+                    console.log("Process completed");
+                });
+            });
+        });
+    });
+});
+
+
+
+/* As the number of asynchronous operations increases, callbacks keep getting nested inside callbacks.
+
+For example:
+
+login
+ └── getUser
+      └── getOrders
+           └── getPayment
+                └── generateReport
+                     └── completed
+
+This is called Callback Hell or sometimes the Pyramid of Doom. */
