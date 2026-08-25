@@ -1,0 +1,25 @@
+{
+  "name": "jobsearch-agents",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-agent automated job search and application platform (TypeScript + Playwright + BDD)",
+  "type": "module",
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build -w @jobsearch/backend && npm run build -w @jobsearch/frontend",
+    "typecheck": "npm run typecheck -w @jobsearch/backend && npm run typecheck -w @jobsearch/frontend",
+    "test": "npm run test -w @jobsearch/backend",
+    "test:e2e": "npm run test:e2e -w @jobsearch/frontend",
+    "dev:backend": "npm run dev -w @jobsearch/backend",
+    "dev:frontend": "npm run dev -w @jobsearch/frontend",
+    "start": "npm run start -w @jobsearch/backend"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}

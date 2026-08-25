@@ -1,0 +1,9 @@
+{
+  "default": {
+    "require": ["tsx"],
+    "format": ["progress"],
+    "paths": ["features/**/*.feature"],
+    "import": ["test/env.ts", "test/environment.ts", "test/support/**/*.ts", "test/steps/**/*.ts"],
+    "publishQuiet": true
+  }
+}
