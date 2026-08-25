@@ -40,7 +40,7 @@ Express 5 + TypeScript (ESM, NodeNext). The app is built by `createApp()` in `sr
 | --- | --- |
 | `src/routes/` | Express routers — one file per resource (auth, resumes, jobs, applications, reports, agents, dashboard) |
 | `src/agents/` | The 15 specialized agents + `AgentOrchestrator` |
-| `src/scrapers/` | Portal scrapers. `SCRAPER_DEMO_MODE=true` returns instant sample data; live mode drives Playwright |
+| `src/scrapers/` | Portal scrapers + general-web scraper. `SCRAPER_DEMO_MODE=true` returns instant sample data; live mode drives Playwright / search-engine discovery |
 | `src/services/` | Domain logic: resume parsing, ATS optimization, matching, fraud detection, multi-resume, reporting, content generation, skill gap |
 | `src/db/` | `node:sqlite` connection + repository layer (all SQL lives here) |
 | `src/core/` | Config (zod-validated), security (hashing, JWT, vault), middleware, validation, logging, storage, errors, shared types |
@@ -75,7 +75,7 @@ Every run is recorded in the `agent_runs` table, so run history is always visibl
 | 1 | `resume-parser` | Extracts structured data (skills, education, experience) from uploaded resumes |
 | 2 | `resume-builder` | Creates tailored resume versions for a target job |
 | 3 | `resume-optimizer` | ATS-optimizes against a JD; targets a score of 90+ |
-| 4 | `job-search` | Searches all portals via Playwright (or demo data) and persists jobs |
+| 4 | `job-search` | Searches all portals + the general web and persists jobs |
 | 5 | `job-matching` | Scores a job against a resume with cosine similarity (target ≥ 0.75) |
 | 6 | `application` | Auto-applies (safety-gated by `AUTOMATION_ENABLED`) |
 | 7 | `reporting` | Compiles and delivers the daily report |
@@ -101,7 +101,7 @@ Every run is recorded in the `agent_runs` table, so run history is always visibl
 ## Data flow: a resume becomes an application
 
 1. **Upload** — `POST /resumes` (multipart). `multer` buffers the file (5 MB limit), `extractTextFromBuffer` pulls raw text (PDF via `pdf-parse`, DOCX via `mammoth`, TXT direct), `parseResumeText` produces a `ParsedResume`, and the file is stored under `apps/backend/data/uploads/`.
-2. **Search** — `POST /jobs/search` runs every portal scraper. Each job is passed through `assessFraud` and persisted with fraud flags/score.
+2. **Search** — `POST /jobs/search` runs every portal scraper plus the general-web scraper. The web scraper discovers postings on any site (via DuckDuckGo's HTML endpoint, with Bing fallback) and extracts requirements (skills, experience, education, responsibilities, salary) from each page. Each job is passed through `assessFraud` and persisted with fraud flags/score.
 3. **Match** — `POST /jobs/:id/match` compares the job description against the resume using keyword extraction + cosine similarity over token sets. The blended score is stored in the `matches` table.
 4. **Optimize / tailor** — `POST /resumes/:id/optimize` returns an ATS report and tailored skills; `POST /resumes/:id/tailor` creates a new resume version for the job.
 5. **Apply** — `POST /jobs/:id/apply` runs the Application Agent. In demo/safety mode this records the application with a generated cover letter and ATS score; with `AUTOMATION_ENABLED=true` it drives the portal flow with Playwright and retries up to 3 times.

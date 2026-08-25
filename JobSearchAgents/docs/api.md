@@ -96,9 +96,9 @@ Body: `{ "jobId": string }`
 
 ### `POST /jobs/search`
 
-Search all portals (or one). Each job is fraud-scored and persisted. Demo mode (`demo: true` or `SCRAPER_DEMO_MODE=true`) returns sample data instantly.
+Search all portals **and the general web**, or just one source. In demo mode (`demo: true` or `SCRAPER_DEMO_MODE=true`) sources return sample data instantly. The `web` source discovers job postings across the open web (any careers/company site) via search-engine discovery and extracts detailed requirements (skills, experience, education, responsibilities, salary) from each posting.
 
-Body: `{ "query"?: string (default "software engineer"), "location"?: string, "portal"?: "naukri"|"linkedin"|"indeed"|"glassdoor", "demo"?: boolean }`
+Body: `{ "query"?: string (default "software engineer"), "location"?: string, "portal"?: "naukri"|"linkedin"|"indeed"|"glassdoor"|"web", "demo"?: boolean }`
 
 - `200` — `{ "jobs": Job[], "stored": number, "demoMode": boolean, "elapsedMs": number }`
 

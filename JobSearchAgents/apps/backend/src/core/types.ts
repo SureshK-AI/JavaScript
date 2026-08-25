@@ -1,6 +1,6 @@
 /** Shared domain types for the multi-agent job search platform. */
 
-export type PortalName = 'naukri' | 'linkedin' | 'indeed' | 'glassdoor';
+export type PortalName = 'naukri' | 'linkedin' | 'indeed' | 'glassdoor' | 'web';
 
 export type ApplicationStatus =
   | 'submitted'

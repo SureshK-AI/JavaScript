@@ -79,7 +79,7 @@ curl -X POST http://localhost:3001/api/agents/resume-optimizer/run \
 
 | Agent | What it does | Expect |
 | --- | --- | --- |
-| `job-search` | Searches all portals (demo = sample jobs) | `Collected 16 jobs from 4 portals in Nms` |
+| `job-search` | Searches all portals + the general web (demo = sample jobs) | `Collected N jobs from 4 portals + web in Nms` |
 | `reporting` | Builds + "delivers" the daily report | `Report for <date>: n applications, delivered via email` |
 | `job-tracker` | Lists applications + optional status update | `Tracking n applications (submitted: n)` |
 | `feedback` | Classifies a recruiter email into a status | `Classified recruiter email as "interview"` |

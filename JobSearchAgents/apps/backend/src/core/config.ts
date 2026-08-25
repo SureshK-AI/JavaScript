@@ -25,6 +25,9 @@ const envSchema = z.object({
   SCRAPER_RETRIES: z.coerce.number().default(2),
   SCRAPER_DEMO_MODE: z.coerce.boolean().default(true),
   AUTOMATION_ENABLED: z.coerce.boolean().default(false),
+  WEB_SEARCH_ENGINE: z.string().default('duckduckgo'),
+  WEB_SEARCH_MAX_RESULTS: z.coerce.number().default(8),
+  WEB_SEARCH_FOLLOW_DETAIL: z.coerce.boolean().default(true),
 
   OPENAI_API_KEY: z.string().optional().default(''),
   SENDGRID_API_KEY: z.string().optional().default(''),

@@ -84,11 +84,12 @@ export default function Jobs() {
           <div>
             <label htmlFor="portal">Portal</label>
             <select id="portal" value={portal} onChange={(e) => setPortal(e.target.value)}>
-              <option value="">All portals</option>
+              <option value="">All portals + web</option>
               <option value="naukri">Naukri</option>
               <option value="linkedin">LinkedIn</option>
               <option value="indeed">Indeed</option>
               <option value="glassdoor">Glassdoor</option>
+              <option value="web">Web (general)</option>
             </select>
           </div>
         </div>

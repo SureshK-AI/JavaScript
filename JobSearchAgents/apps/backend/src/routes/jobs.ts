@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { jobsRepo, matchesRepo, resumesRepo } from '../db/repository.js';
-import { searchAllPortals, searchPortal } from '../scrapers/index.js';
+import { searchAllPortals, searchPortal, SEARCH_SOURCES } from '../scrapers/index.js';
 import { matchJobToResume } from '../services/matcher.js';
 import { assessFraud } from '../services/fraudDetection.js';
 import { parseOrThrow } from '../core/validation.js';
@@ -13,7 +13,7 @@ const router = Router();
 const searchSchema = z.object({
   query: z.string().min(1).default('software engineer'),
   location: z.string().optional().default(''),
-  portal: z.string().optional(),
+  portal: z.enum(SEARCH_SOURCES).optional(),
   demo: z.boolean().optional(),
 });
 
