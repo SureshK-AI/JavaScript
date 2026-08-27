@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ATS Resume Checker — JobSearchAgents</title>
+    <style>
+      :root {
+        --bg: #0f1420;
+        --card: #1a2233;
+        --border: #2a3550;
+        --text: #e6edf7;
+        --muted: #8fa0bf;
+        --primary: #4c8dff;
+        --good: #35d07f;
+        --warn: #f5b942;
+        --bad: #f05d5d;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        padding: 2rem 1rem;
+      }
+      main { max-width: 860px; margin: 0 auto; }
+      h1 { margin: 0 0 0.25rem; font-size: 1.5rem; }
+      .sub { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.9rem; }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+      }
+      label { display: block; font-size: 0.8rem; color: var(--muted); margin: 0.75rem 0 0.3rem; }
+      input[type='text'], input[type='password'], input[type='file'], select, textarea {
+        width: 100%;
+        padding: 0.55rem 0.7rem;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: #0f1522;
+        color: var(--text);
+        font-size: 0.9rem;
+      }
+      textarea { font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem; }
+      button {
+        margin-top: 0.9rem;
+        padding: 0.55rem 1rem;
+        border-radius: 6px;
+        border: none;
+        background: var(--primary);
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      button.secondary { background: #2a3550; }
+      .row { display: flex; gap: 1rem; flex-wrap: wrap; }
+      .row > div { flex: 1; min-width: 200px; }
+      .status { font-size: 0.85rem; color: var(--muted); margin-top: 0.6rem; min-height: 1.2em; }
+      .error { color: var(--bad); }
+      .score-wrap { text-align: center; padding: 0.5rem 0 0.25rem; }
+      .score {
+        font-size: 3.4rem;
+        font-weight: 800;
+        line-height: 1;
+      }
+      .score.good { color: var(--good); }
+      .score.warn { color: var(--warn); }
+      .score.bad { color: var(--bad); }
+      .meter {
+        height: 10px;
+        border-radius: 5px;
+        background: #0f1522;
+        border: 1px solid var(--border);
+        overflow: hidden;
+        margin: 0.6rem 0 1rem;
+      }
+      .meter > div { height: 100%; transition: width 0.5s ease; }
+      .badge {
+        display: inline-block;
+        padding: 0.15rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+      .badge.good { background: rgba(53, 208, 127, 0.15); color: var(--good); }
+      .badge.warn { background: rgba(245, 185, 66, 0.15); color: var(--warn); }
+      .badge.bad { background: rgba(240, 93, 93, 0.15); color: var(--bad); }
+      ul { margin: 0.25rem 0; padding-left: 1.1rem; }
+      li { margin: 0.2rem 0; font-size: 0.85rem; }
+      .muted { color: var(--muted); }
+      .parsed-skills { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+      .chip {
+        background: #0f1522;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0.2rem 0.6rem;
+        font-size: 0.75rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>ATS Resume Checker</h1>
+      <p class="sub">Upload your resume, pick a job, and get an ATS compatibility score with actionable fixes.</p>
+
+      <div class="card" id="auth-card">
+        <h3 style="margin-top: 0">1 · Login or register</h3>
+        <div class="row">
+          <div>
+            <label for="email">Email</label>
+            <input type="text" id="email" placeholder="you@example.com" />
+          </div>
+          <div>
+            <label for="password">Password (min 8 chars)</label>
+            <input type="password" id="password" placeholder="password123" />
+          </div>
+          <div>
+            <label for="name">Name (register only)</label>
+            <input type="text" id="name" placeholder="Your Name" />
+          </div>
+        </div>
+        <div class="row">
+          <button id="login-btn" class="secondary">Log in</button>
+          <button id="register-btn" class="secondary">Register</button>
+          <button id="oauth-btn" class="secondary">Demo OAuth (linkedin)</button>
+        </div>
+        <div class="status" id="auth-status"></div>
+      </div>
+
+      <div class="card" id="upload-card" style="display: none">
+        <h3 style="margin-top: 0">2 · Upload your resume</h3>
+        <label for="file">Resume file (PDF, DOCX, or TXT)</label>
+        <input type="file" id="file" accept=".pdf,.docx,.txt" />
+        <button id="upload-btn">Upload & parse</button>
+        <div class="status" id="upload-status"></div>
+        <div id="parsed-box" style="display: none">
+          <p class="muted" style="margin-bottom: 0.4rem">Parsed skills:</p>
+          <div class="parsed-skills" id="parsed-skills"></div>
+        </div>
+      </div>
+
+      <div class="card" id="job-card" style="display: none">
+        <h3 style="margin-top: 0">3 · Pick a job to check against</h3>
+        <label for="query">Search the web + portals</label>
+        <div class="row">
+          <div>
+            <input type="text" id="query" value="software engineer" />
+          </div>
+          <div>
+            <select id="portal">
+              <option value="">All portals + web</option>
+              <option value="naukri">Naukri</option>
+              <option value="linkedin">LinkedIn</option>
+              <option value="indeed">Indeed</option>
+              <option value="glassdoor">Glassdoor</option>
+              <option value="web">Web (general)</option>
+            </select>
+          </div>
+          <div style="flex: 0 0 auto">
+            <button id="search-btn" class="secondary">Search jobs</button>
+          </div>
+        </div>
+        <div class="status" id="search-status"></div>
+        <div id="jobs-box" style="display: none">
+          <label for="job-select">Job</label>
+          <select id="job-select"></select>
+        </div>
+      </div>
+
+      <div class="card" id="ats-card" style="display: none">
+        <h3 style="margin-top: 0">4 · ATS score</h3>
+        <button id="check-btn">Run ATS check</button>
+        <div class="status" id="ats-status"></div>
+        <div id="ats-result" style="display: none">
+          <div class="score-wrap">
+            <div class="score" id="ats-score">0</div>
+            <div id="ats-label"></div>
+          </div>
+          <div class="meter"><div id="ats-meter"></div></div>
+          <div class="row">
+            <div>
+              <p class="muted" style="margin: 0.4rem 0">Present keywords</p>
+              <div class="parsed-skills" id="present-keywords"></div>
+            </div>
+            <div>
+              <p class="muted" style="margin: 0.4rem 0">Missing keywords</p>
+              <div class="parsed-skills" id="missing-keywords"></div>
+            </div>
+          </div>
+          <p class="muted" style="margin: 0.9rem 0 0.3rem">Suggestions</p>
+          <ul id="suggestions"></ul>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const API = '/api';
+      let token = localStorage.getItem('ats_token') ?? null;
+      let resumeId = null;
+
+      const $ = (id) => document.getElementById(id);
+
+      async function api(path, { method = 'GET', body, form } = {}) {
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        if (body !== undefined && !form) headers['Content-Type'] = 'application/json';
+        const res = await fetch(API + path, {
+          method,
+          headers,
+          body: form ? body : body !== undefined ? JSON.stringify(body) : undefined,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error ?? `Request failed: ${res.status}`);
+        return data;
+      }
+
+      function setStatus(el, msg, isError = false) {
+        el.textContent = msg;
+        el.className = 'status' + (isError ? ' error' : '');
+      }
+
+      function show(id, visible) {
+        $(id).style.display = visible ? '' : 'none';
+      }
+
+      // --- Auth ---
+      async function login(email, password) {
+        const { token } = await api('/auth/login', { method: 'POST', body: { email, password } });
+        localStorage.setItem('ats_token', token);
+        token = token;
+        onAuthed();
+      }
+
+      async function register(email, password, name) {
+        const { token } = await api('/auth/register', { method: 'POST', body: { email, password, name } });
+        localStorage.setItem('ats_token', token);
+        token = token;
+        onAuthed();
+      }
+
+      async function oauth() {
+        const { token } = await api('/auth/oauth/linkedin');
+        localStorage.setItem('ats_token', token);
+        token = token;
+        onAuthed();
+      }
+
+      function onAuthed() {
+        show('auth-card', false);
+        show('upload-card', true);
+        show('job-card', true);
+        setStatus($('auth-status'), 'Logged in.');
+        loadJobs();
+      }
+
+      $('login-btn').onclick = async () => {
+        try {
+          await login($('email').value.trim(), $('password').value);
+        } catch (e) {
+          setStatus($('auth-status'), e.message, true);
+        }
+      };
+      $('register-btn').onclick = async () => {
+        try {
+          await register($('email').value.trim(), $('password').value, $('name').value.trim() || 'ATS User');
+        } catch (e) {
+          setStatus($('auth-status'), e.message, true);
+        }
+      };
+      $('oauth-btn').onclick = async () => {
+        try {
+          await oauth();
+        } catch (e) {
+          setStatus($('auth-status'), e.message, true);
+        }
+      };
+
+      // --- Upload ---
+      $('upload-btn').onclick = async () => {
+        const file = $('file').files[0];
+        if (!file) {
+          setStatus($('upload-status'), 'Pick a file first.', true);
+          return;
+        }
+        $('upload-btn').disabled = true;
+        setStatus($('upload-status'), 'Uploading & parsing…');
+        try {
+          const form = new FormData();
+          form.append('file', file);
+          const data = await api('/resumes', { method: 'POST', form });
+          resumeId = data.resume.id;
+          const skills = data.parsed?.skills ?? [];
+          $('parsed-skills').innerHTML = skills.length
+            ? skills.map((s) => `<span class="chip">${s}</span>`).join('')
+            : '<span class="muted">No known skills detected — add skill keywords to your resume.</span>';
+          show('parsed-box', true);
+          setStatus(
+            $('upload-status'),
+            `Parsed in ${data.parseTimeMs}ms — ${skills.length} skills, email ${data.parsed?.email ?? 'n/a'}.`,
+          );
+        } catch (e) {
+          setStatus($('upload-status'), e.message, true);
+        } finally {
+          $('upload-btn').disabled = false;
+        }
+      };
+
+      // --- Jobs ---
+      async function loadJobs() {
+        try {
+          const { jobs } = await api('/jobs');
+          fillJobSelect(jobs);
+        } catch {
+          /* will be populated by search */
+        }
+      }
+
+      function fillJobSelect(jobs) {
+        const sel = $('job-select');
+        sel.innerHTML = '';
+        if (!jobs.length) {
+          sel.innerHTML = '<option value="">No jobs yet — search above</option>';
+          return;
+        }
+        for (const j of jobs) {
+          const opt = document.createElement('option');
+          opt.value = j.id;
+          opt.textContent = `${j.title} @ ${j.company} (${j.portal})`;
+          sel.appendChild(opt);
+        }
+        show('jobs-box', true);
+      }
+
+      $('search-btn').onclick = async () => {
+        $('search-btn').disabled = true;
+        setStatus($('search-status'), 'Searching portals + web…');
+        try {
+          const data = await api('/jobs/search', {
+            method: 'POST',
+            body: {
+              query: $('query').value.trim() || 'software engineer',
+              location: '',
+              portal: $('portal').value || undefined,
+              demo: true,
+            },
+          });
+          fillJobSelect(data.jobs ?? []);
+          setStatus($('search-status'), `Found ${data.stored} jobs (${data.demoMode ? 'demo' : 'live'}) in ${data.elapsedMs}ms.`);
+        } catch (e) {
+          setStatus($('search-status'), e.message, true);
+        } finally {
+          $('search-btn').disabled = false;
+        }
+      };
+
+      // --- ATS check ---
+      $('check-btn').onclick = async () => {
+        const jobId = $('job-select').value;
+        if (!resumeId) {
+          setStatus($('ats-status'), 'Upload a resume first.', true);
+          return;
+        }
+        if (!jobId) {
+          setStatus($('ats-status'), 'Search jobs and pick one first.', true);
+          return;
+        }
+        $('check-btn').disabled = true;
+        setStatus($('ats-status'), 'Running ATS optimizer…');
+        try {
+          const res = await api('/agents/resume-optimizer/run', {
+            method: 'POST',
+            body: { resumeId, jobId },
+          });
+          if (res.status === 'error') throw new Error(res.error ?? res.summary);
+          const report = res.data?.report;
+          if (!report) throw new Error('No report returned');
+          renderScore(report);
+          setStatus($('ats-status'), res.summary);
+        } catch (e) {
+          setStatus($('ats-status'), e.message, true);
+        } finally {
+          $('check-btn').disabled = false;
+        }
+      };
+
+      function renderScore(report) {
+        const score = report.score;
+        $('ats-score').textContent = score;
+        $('ats-score').className = 'score ' + (score >= 90 ? 'good' : score >= 60 ? 'warn' : 'bad');
+        $('ats-label').innerHTML =
+          score >= 90
+            ? '<span class="badge good">ATS compliant (≥ 90)</span>'
+            : score >= 60
+              ? '<span class="badge warn">Needs work</span>'
+              : '<span class="badge bad">Weak match</span>';
+        $('ats-meter').style.width = score + '%';
+        $('ats-meter').style.background = score >= 90 ? 'var(--good)' : score >= 60 ? 'var(--warn)' : 'var(--bad)';
+        $('present-keywords').innerHTML = (report.presentKeywords ?? []).length
+          ? report.presentKeywords.map((k) => `<span class="chip">${k}</span>`).join('')
+          : '<span class="muted">—</span>';
+        $('missing-keywords').innerHTML = (report.missingKeywords ?? []).length
+          ? report.missingKeywords.map((k) => `<span class="chip" style="border-color:var(--bad);color:var(--bad)">${k}</span>`).join('')
+          : '<span class="muted">None 🎉</span>';
+        $('suggestions').innerHTML = (report.suggestions ?? []).map((s) => `<li>${s}</li>`).join('');
+        show('ats-result', true);
+      }
+
+      // Auto-login if a token exists.
+      if (token) {
+        try {
+          await api('/auth/me');
+          onAuthed();
+        } catch {
+          localStorage.removeItem('ats_token');
+          token = null;
+        }
+      }
+    </script>
+  </body>
+</html>

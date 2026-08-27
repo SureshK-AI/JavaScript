@@ -12,4 +12,6 @@ const p1 = Promise.resolve("Login");
 const p2 = Promise.resolve("User");
 const p3 = Promise.resolve("Orders");
 
-// TODO: Use Promise.all() and print all results.
+Promise.all([p1, p2, p3])
+    .then(results => console.log(results))
+    .catch(error => console.log(error));
